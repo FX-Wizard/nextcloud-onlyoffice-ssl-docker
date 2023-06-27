@@ -1,0 +1,102 @@
+version: '3.8'
+
+secrets:
+  # Secrets are single-line text files where the sole content is the secret
+  # Paths in this example assumes that secrets are kept in local folder called ".secrets"
+  db_root_pwd:
+    file: .secrets/db_root_pwd.txt
+  mysql_pwd:
+    file: .secrets/mysql_pwd.txt
+  mysql_db:
+    file: .secrets/mysql_db.txt
+  mysql_user:
+    file: .secrets/mysql_user.txt
+  #onlyoffice_jwt_secret:
+    #file: .secrets/onlyoffice_jwt_secret.txt
+    
+volumes:
+  nextcloud-data:
+  nextcloud-db:
+  document_data:
+  document_log:
+  #document_config:
+
+services:
+  nextcloud:
+    container_name: nextcloud-app
+    image: nextcloud:apache
+    restart: unless-stopped
+    expose:
+      - '80'
+    environment:
+      - TRUSTED_PROXIES=nginx-server
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_pwd
+      - MYSQL_DATABASE_FILE=/run/secrets/mysql_db
+      - MYSQL_USER_FILE=/run/secrets/mysql_user
+      - OVERWRITEPROTOCOL=https
+      #- NEXTCLOUD_ADMIN_USER_FILE=/run/secrets/nextcloud_admin_user
+      #- NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/nextcloud_admin_pwd
+    secrets:
+      - mysql_db
+      - mysql_pwd
+      - mysql_user
+    volumes:
+      - nextcloud-data:/var/www/html
+    depends_on:
+      - nextcloud-db
+
+  nextcloud-db:
+    container_name: nextcloud-db
+    image: mariadb
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    secrets:
+      - db_root_pwd
+      - mysql_pwd
+      - mysql_user
+      - mysql_db
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db_root_pwd
+      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_pwd
+      - MYSQL_DATABASE_FILE=/run/secrets/mysql_db
+      - MYSQL_USER_FILE=/run/secrets/mysql_user
+    volumes:
+      - nextcloud-db:/var/lib/mysql
+
+  onlyoffice-document-server:
+    container_name: onlyoffice-document-server
+    image: onlyoffice/documentserver:latest
+    restart: unless-stopped
+    environment:
+      - JWT_ENABLED=true
+      #- JWT_SECRET=/run/secrets/onlyoffice_jwt_secret
+      - JWT_HEADER=AuthorizationJwt
+    #secrets:
+      #- onlyoffice_jwt_secret
+    env_file:
+      - .secrets/onlyoffice_jwt_secret.env
+    expose:
+      - '80'
+      - '443'
+    volumes:
+      - document_data:/var/www/onlyoffice/Data
+      - document_log:/var/log/onlyoffice
+      #- document_config:/etc/onlyoffice/documentserver
+
+  nginx-server:
+    container_name: nginx-server
+    image: linuxserver/swag
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      - TZ=
+      - URL=
+      - SUBDOMAINS=
+      - VALIDATION=http
+    volumes:
+      - ./nginx-config:/config
