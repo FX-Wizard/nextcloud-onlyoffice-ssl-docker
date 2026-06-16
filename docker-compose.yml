@@ -1,68 +1,61 @@
-version: '3.8'
-
 secrets:
   # Secrets are single-line text files where the sole content is the secret
   # Paths in this example assumes that secrets are kept in local folder called ".secrets"
   db_root_pwd:
     file: .secrets/db_root_pwd.txt
   mysql_pwd:
-    file: .secrets/mysql_pwd.txt
+    file: .secrets/db_pwd.txt
   mysql_db:
-    file: .secrets/mysql_db.txt
+    file: .secrets/db_name.txt
   mysql_user:
-    file: .secrets/mysql_user.txt
-  #onlyoffice_jwt_secret:
-    #file: .secrets/onlyoffice_jwt_secret.txt
+    file: .secrets/db_user.txt
     
 volumes:
   nextcloud-data:
   nextcloud-db:
   document_data:
   document_log:
-  #document_config:
+  caddy_data:
+  caddy_config:
 
 services:
   nextcloud:
     container_name: nextcloud-app
-    image: nextcloud:apache
+    image: nextcloud:34-apache
     restart: unless-stopped
     expose:
       - '80'
     environment:
-      - TRUSTED_PROXIES=nginx-server
-      - MYSQL_HOST=nextcloud-db
-      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_pwd
-      - MYSQL_DATABASE_FILE=/run/secrets/mysql_db
-      - MYSQL_USER_FILE=/run/secrets/mysql_user
+      - TRUSTED_PROXIES=caddy-server
+      - POSTGRES_HOST=nextcloud-db
+      - POSTGRES_PASSWORD_FILE=/run/secrets/mysql_pwd
+      - POSTGRES_DB_FILE=/run/secrets/mysql_db
+      - POSTGRES_USER_FILE=/run/secrets/mysql_user
       - OVERWRITEPROTOCOL=https
-      #- NEXTCLOUD_ADMIN_USER_FILE=/run/secrets/nextcloud_admin_user
-      #- NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/nextcloud_admin_pwd
     secrets:
       - mysql_db
       - mysql_pwd
       - mysql_user
     volumes:
       - nextcloud-data:/var/www/html
+      - /mnt/photos:/mnt/photos
     depends_on:
-      - nextcloud-db
+      - postgres-db
 
-  nextcloud-db:
+  postgres-db:
+    image: postgres:17
     container_name: nextcloud-db
-    image: mariadb
     restart: unless-stopped
-    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
     secrets:
-      - db_root_pwd
+      - mysql_db
       - mysql_pwd
       - mysql_user
-      - mysql_db
     environment:
-      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db_root_pwd
-      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_pwd
-      - MYSQL_DATABASE_FILE=/run/secrets/mysql_db
-      - MYSQL_USER_FILE=/run/secrets/mysql_user
+      POSTGRES_USER_FILE: /run/secrets/mysql_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/mysql_pwd
+      POSTGRES_DB_FILE: /run/secrets/mysql_db
     volumes:
-      - nextcloud-db:/var/lib/mysql
+      - nextcloud-db:/var/lib/postgresql/data
 
   onlyoffice-document-server:
     container_name: onlyoffice-document-server
@@ -82,21 +75,15 @@ services:
     volumes:
       - document_data:/var/www/onlyoffice/Data
       - document_log:/var/log/onlyoffice
-      #- document_config:/etc/onlyoffice/documentserver
 
-  nginx-server:
-    container_name: nginx-server
-    image: linuxserver/swag
+  caddy:
+    image: caddy:2
+    container_name: caddy-server
     restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
     ports:
-      - 80:80
-      - 443:443
-    environment:
-      - TZ=
-      - URL=
-      - SUBDOMAINS=
-      - VALIDATION=http
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx-config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config

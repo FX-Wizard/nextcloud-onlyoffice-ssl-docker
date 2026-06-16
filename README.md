@@ -78,11 +78,11 @@ This repo contains everything you need to deploy a self hosted Nextcloud with On
 
 4. Add domain name for Lets Encrypt certificate
 
-    This example uses linuxserver.io swag as a reverse proxy and way to get an SSL certificate from Lets Encrypt
+    This example uses Caddy as a reverse proxy, which can automagically get a certificate from Lets Encrypt
 
     Open the `docker-compose.yml` file in a text editor like nano or vim
 
-    Change the folling 2 lines under `nginx-server:` `environment:`
+    Change the folling 2 lines under `caddy:` `environment:`
     ```
     - TZ=<your/timezone>
     - URL=<your.domain.name>
@@ -90,9 +90,9 @@ This repo contains everything you need to deploy a self hosted Nextcloud with On
 
     > Note: You can use the Linux command `timedatectl list-timezones` or go to this [wiki page](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) to get a list of TZ identifiers.
 
-5. Add domain name to Nginx config
+5. Add domain name to Caddyfile
 
-    Use your favorite text editor to open the file `nextcloud.subdomain.conf` located in `nginx-config/nginx/proxy-confs`
+    Use your favorite text editor to open the file `Caddyfile`
 
     Find and replace the text `nextcloud.example.com` with your domain address.
 
